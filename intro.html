@@ -16,7 +16,7 @@
 
     .header {
       text-align: center;
-      padding: 50px 20px;
+      padding: 50px 20px 80px;
     }
 
     .header .logo {
@@ -27,7 +27,7 @@
 
     .header h1 {
       font-size: 2.5rem;
-      margin: 10px 0;
+      margin: 10px 0 30px;
     }
 
     .header .subtitle {
@@ -40,14 +40,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 40px;
+      gap: 60px;
       padding: 0 20px;
     }
 
     .features {
       display: flex;
       justify-content: center;
-      gap: 20px;
+      gap: 40px;
       flex-wrap: wrap;
     }
 
@@ -79,6 +79,7 @@
 
     .button-container {
       text-align: center;
+      margin-top: 40px;
     }
 
     .connect-button {
@@ -98,6 +99,7 @@
 
     .how-it-works {
       text-align: center;
+      margin-top: 80px;
     }
 
     .how-it-works h2 {
@@ -108,7 +110,7 @@
     .steps {
       display: flex;
       justify-content: center;
-      gap: 40px;
+      gap: 60px;
     }
 
     .step {
@@ -135,6 +137,7 @@
       background: #191414;
       color: #ccc;
       font-size: 0.9rem;
+      margin-top: 80px;
     }
   </style>
 </head>
@@ -142,10 +145,8 @@
   <div class="app">
     <header class="header">
       <div class="logo">
-        <i class="fas fa-music"></i>
-      </div>
-      <h1>Create personalized playlists based on your music taste</h1>
-      <p class="subtitle">Using Spotify's powerful recommendation engine</p>
+        <img src="logo.png" alt="Spotify Logo" class="logo" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%);" />
+        <span class="logo-text" style="position: absolute; top: 60px; left: 50%; transform: translateX(-50%); font-size: 2rem;">PiedPiper</span>
     </header>
     <div class="container">
       <div class="features">
@@ -187,7 +188,7 @@
       </div>
     </div>
     <footer class="footer">
-      <p>SpotifyPlay © 2025. All rights reserved.</p>
+      <p>SpotifyPlay &copy; 2025. All rights reserved.</p>
     </footer>
   </div>
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
