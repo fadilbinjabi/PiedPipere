@@ -1,7 +1,6 @@
 const clientId = '43f735a675d04dc593023010c69937f3';
 const redirectUri = 'http://localhost:5500/main.html';
-const clientSecret = 'b210e084ecbc47acb8e401c2d91ef440';
-const scopes = 'user-top-read playlist-read-private playlist-modify-private playlist-modify-public streaming user-read-playback-state user-modify-playback-state';
+const scopes = 'user-top-read playlist-read-private playlist-modify-private playlist-modify-public streaming user-read-playback-state user-modify-playback-state user-read-email user-read-private';
 
 function loginWithSpotify() {
   const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
@@ -9,17 +8,86 @@ function loginWithSpotify() {
 }
 
 
-
-
 const hash = window.location.hash.substring(1);
 const params = new URLSearchParams(hash);
 const accessToken = params.get('access_token');
 
+fetch('https://api.spotify.com/v1/me',{
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+})
+.then((response) => response.json())
+.then((userData) => {
+  const userIconUrl = userData.images[0].url;
+  const userIconContainer = document.querySelector('.user-icon-container');
+  const userIconImg = userIconContainer.querySelector('img');
+  userIconImg.src = userIconUrl;
+  userId = userData.id;
+})
+.catch((error) => {
+  console.error('Error fetching user icon:', error);
+});
+
+let userId;
+
+fetch('https://api.spotify.com/v1/me', {
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+})
+.then((response) => response.json())
+.then((userData) => {
+  console.log('User ID:', userData.id); // store the user ID in a variable
+});
+
+
+fetch(`https://api.spotify.com/v1/me/playlists`, {
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+  },
+})
+.then((response) => response.json())
+.then((data) => {
+  const playlistsList = document.getElementById('user-playlists');
+  playlistsList.innerHTML = data.items
+    .map(
+      (playlist) => `
+      <li data-playlist-id="${playlist.id}" data-playlist-name="${playlist.name}">
+        <img src="${playlist.images?.[0]?.url || 'default.jpg'}" alt="${playlist.name}" />
+        <span title="${playlist.name}">${playlist.name}</span>
+      </li>
+    `
+    )
+    .join('');
+
+  // Add click handlers to playlists
+  document.querySelectorAll('#user-playlists li').forEach(item => {
+    item.addEventListener('click', (event) => {
+      const playlistId = event.currentTarget.getAttribute('data-playlist-id');
+      const playlistName = event.currentTarget.getAttribute('data-playlist-name');
+      showPlaylistTracks(playlistId, playlistName);
+    });
+  });
+})
+.catch(error => console.error('Error fetching playlists:', error));
+
+// Modal close function
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+}
+
+// Close modal when clicking outside or on close button
+document.addEventListener('click', (event) => {
+  if (event.target === document.getElementById('modal')) {
+    closeModal();
+  }
+});
 
 
 
 // Fetch and display top artists
-fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
+fetch('https://api.spotify.com/v1/me/top/artists?limit=50', {
   headers: {
     Authorization: `Bearer ${accessToken}`,
   },
@@ -47,7 +115,7 @@ fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
   });
 
 // Fetch and display top songs
-fetch('https://api.spotify.com/v1/me/top/tracks?limit=10', {
+fetch('https://api.spotify.com/v1/me/top/tracks?limit=50', {
   headers: {
     Authorization: `Bearer ${accessToken}`,
   },
@@ -124,87 +192,9 @@ fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
     document.getElementById('top-genres').innerHTML = '<li>Failed to load genres</li>';
   });
 
-// Fetch and display user playlists
-fetch(`https://api.spotify.com/v1/me/playlists`, {
-  headers: {
-    Authorization: `Bearer ${accessToken}`,
-  },
-})
-  .then((response) => response.json())
-  .then((data) => {
-    const playlistsList = document.getElementById('user-playlists');
-    playlistsList.innerHTML = data.items
-      .map(
-        (playlist) => `
-        <li data-playlist-id="${playlist.id}">
-          <img src="${playlist.images?.[0]?.url || 'default.jpg'}" alt="${playlist.name}" />
-          <span title="${playlist.name}">${playlist.name}</span>
-        </li>
-      `
-      )
-      .join('');
 
-    // Add event listener to playlist list items
-    const playlistItems = document.querySelectorAll('#user-playlists li');
-    playlistItems.forEach((item) => {
-      item.addEventListener('click', (event) => {
-        const playlistId = event.target.closest('li').getAttribute('data-playlist-id');
-        playPlaylist(playlistId);
-      });
-    });
-  })
-  .catch((error) => {
-    console.error('Error fetching user playlists:', error);
-    document.getElementById('user-playlists').innerHTML = '<li>Failed to load playlists</li>';
-  });
 
-// Function to play a playlist
-function playPlaylist(playlistId) {
-  const tracks = [];
-  const limit = 100; // Fetch 100 tracks at a time
-  let offset = 0;
-
-  function fetchTracks() {
-    fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        tracks.push(...data.items.map((item) => item.track));
-        offset += limit;
-        if (data.next) {
-          fetchTracks(); // Fetch next page of tracks
-        } else {
-          playTracks(tracks);
-        }
-      })
-      .catch((error) => {
-        console.error('Error fetching playlist tracks:', error);
-      });
-  }
-
-  fetchTracks(); // Call the fetchTracks function
-}
-
-// Function to play a list of tracks
-function playTracks(tracks) {
-  const player = new Spotify.Player({
-    name: 'SpotifyPlay',
-    getOAuthToken: (callback) => {
-      callback(accessToken);
-    },
-  });
-
-  player.connect().then(() => {
-    player.play({
-      uris: tracks.map((track) => track.uri),
-    });
-  });
-}
-
-// Mock data for active time chart
+// Mock data for active time chart       NOT REAL DATA
 const mockData = {
   labels: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
   datasets: [{
@@ -271,266 +261,169 @@ document.getElementById('chart-type-selector').addEventListener('change', (event
 });
 renderChart();
 
-/*************  ✨ Windsurf Command 🌟  *************/
-// Mood playlist generation
-// List of valid Spotify genre seeds
-const validGenres = [
-  'acoustic', 'ambient', 'classical', 'country', 'dance', 
-  'electronic', 'hip-hop', 'jazz', 'pop', 'rock', 'sleep'
-];
-
-function generateMoodPlaylist() {
-  // Check for valid token
-  if (!accessToken) {
-    alert('Please login again - your session has expired');
-    loginWithSpotify();
-    return;
-  }
-
-  const selectedMood = document.getElementById('mood-selector').value;
-  const playlistLength = parseInt(document.getElementById('playlist-length').value, 10) || 10;
-
-  // Validate genre
-  if (!validGenres.includes(selectedMood)) {
-    alert(`"${selectedMood}" is not a valid Spotify genre. Please choose from the list.`);
-    return;
-  }
-
-  fetch(`https://api.spotify.com/v1/recommendations?limit=${playlistLength}&seed_genres=${selectedMood}`, {
-    headers: { 
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-  })
-  .then(response => {
-    if (!response.ok) {
-      return response.text().then(text => {
-        console.error('API Error:', text);
-        throw new Error(`Spotify API Error: ${response.status}`);
-      });
-    }
-    return response.json();
-  })
-  .then(data => {
-    if (!data.tracks || data.tracks.length === 0) {
-      throw new Error('No tracks found for this genre');
-    }
-
-    const moodPlaylistList = document.getElementById('mood-playlist');
-    moodPlaylistList.innerHTML = data.tracks.map(track => `
-      <li>
-        <span>${track.name} by ${track.artists.map(a => a.name).join(', ')}</span>
-      </li>
-    `).join('');
-    
-    window.generatedPlaylist = data.tracks;
-  })
-  .catch(error => {
-    console.error('Playlist generation failed:', error);
-    document.getElementById('mood-playlist').innerHTML = `
-      <li class="error">Failed to generate playlist: ${error.message}</li>
-    `;
-  });
-}
-/*******  cf6e7611-28b4-4f1c-b1db-180505c4235d  *******/  
-
-function savePlaylist() {
-  if (!window.generatedPlaylist || window.generatedPlaylist.length === 0) {
-    alert('Please generate a playlist first!');
-    return;
-  }
-
-  const playlistName = prompt('Enter a name for your playlist:', 'My Mood Playlist');
-  if (!playlistName) return;
-
-  // First get user ID
-  fetch('https://api.spotify.com/v1/me', {
-    headers: { 
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-  })
-  .then((response) => {
-    if (!response.ok) throw new Error('Failed to get user info');
-    return response.json();
-  })
-  .then((userData) => {
-    // Create the playlist
-    return fetch(`https://api.spotify.com/v1/users/${userData.id}/playlists`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: playlistName,
-        description: 'Generated by Mood-Based Playlist Generator',
-        public: false,
-      }),
-    });
-  })
-  .then((response) => {
-    if (!response.ok) throw new Error('Failed to create playlist');
-    return response.json();
-  })
-  .then((playlistData) => {
-    // Add tracks to the playlist
-    const trackUris = window.generatedPlaylist.map(track => track.uri);
-    return fetch(`https://api.spotify.com/v1/playlists/${playlistData.id}/tracks`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        uris: trackUris,
-      }),
-    });
-  })
-  .then((response) => {
-    if (!response.ok) throw new Error('Failed to add tracks to playlist');
-    alert('Playlist saved successfully!');
-  })
-  .catch((error) => {
-    console.error('Error saving playlist:', error);
-    alert(`Failed to save playlist: ${error.message}`);
-  });
-}
 // Modal functionality
-function viewFullList(type) {
-  const list = type === 'artists' ? window.fullArtistsList : window.fullSongsList;
+function viewFullList(type, list) {
   const fullListHtml = list
-    .map(
-      (item) => `
-        <li>
-          <img src="${item.images ? item.images[0]?.url : item.album.images[0]?.url || 'default.jpg'}" 
-               alt="${item.name}" class="song-image" />
-          <span class="song-info">${item.name} ${item.artists ? `by ${item.artists.map((artist) => artist.name).join(', ')}` : ''}</span>
-          <button class="play-button" data-song-url="${item.preview_url}">Play</button>
-        </li>`
-    )
+    .map((item) => {
+      let itemHtml = '';
+      if (type === 'artists' || type === 'songs') {
+        itemHtml = `
+          <li>
+            <img src="${item.images ? item.images[0]?.url : item.album.images[0]?.url || 'default.jpg'}" 
+                 alt="${item.name}" class="song-image" />
+            <span class="song-info">${item.name} ${item.artists ? `by ${item.artists.map((artist) => artist.name).join(', ')}` : ''}</span>
+            <button class="play-button" data-song-url="${item.preview_url}">Play</button>
+          </li>
+        `;
+      } 
+      return itemHtml;
+    })
     .join('');
 
   document.getElementById('modal-content').innerHTML = `
     <div class="modal-header">
-      <h3>Your Top ${type === 'artists' ? 'Artists' : 'Songs'}</h3>
+      <h3>Your ${type === 'artists' ? 'Top Artists' : type === 'songs' ? 'Top Songs' : ''}</h3>
       <button id="modal-close-button" class="close-button">Close</button>
     </div>
-    <ul class="song-list">${fullListHtml}</ul>
+    <ul class="full-list">${fullListHtml}</ul>
   `;
   document.getElementById('modal').style.display = 'flex';
-
+  
   // Add event listener to close modal when clicking outside
-  document.getElementById('modal').addEventListener('click', (event) => {
+  document.addEventListener('click', (event) => {
     if (event.target === document.getElementById('modal')) {
       closeModal();
     }
   });
-
+  
   // Add event listener to close modal when clicking close button
-  document.getElementById('modal-close-button').addEventListener('click', closeModal);
-
-  // Add event listener to play music when clicking play button
-  document.querySelectorAll('.play-button').forEach((button) => {
-    button.addEventListener('click', (event) => {
-      const songUrl = event.target.getAttribute('data-song-url');
-      playMusic(songUrl);
-    });
+  document.getElementById('modal-close-button').addEventListener('click', () => {
+    closeModal();
   });
 }
 
+
+
+
+
+function showPlaylistTracks(playlistId, playlistName) {
+  fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    const tracks = data.items.map(item => item.track);
+    
+    const tracksHtml = tracks.map(track => `
+      <li>
+        <img src="${track.album.images[0]?.url || 'default.jpg'}" 
+             alt="${track.name}" class="track-image" />
+        <span class="track-info">
+          ${track.name} by ${track.artists.map(artist => artist.name).join(', ')}
+        </span>
+        ${track.preview_url ? 
+          `<button class="play-button" data-song-url="${track.preview_url}">Play</button>` : 
+          ''}
+      </li> 
+    `).join('');
+
+    document.getElementById('modal-content').innerHTML = `
+      <div class="modal-header">
+        <h3>${playlistName}</h3>
+        <button id="modal-close-button" class="close-button">Close</button>
+      </div>
+      <ul class="playlist-tracks">${tracksHtml}</ul>
+    `;
+    
+    document.getElementById('modal').style.display = 'flex';
+    
+    // Add event listeners for play buttons
+    document.querySelectorAll('.play-button').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const audioUrl = e.target.getAttribute('data-song-url');
+        // Implement your audio playback logic here
+        console.log('Play:', audioUrl);
+      });
+    });
+  })
+  .catch(error => console.error('Error fetching playlist tracks:', error));
+}
 function closeModal() {
   document.getElementById('modal').style.display = 'none';
 }
+// Function to save a playlist
+function savePlaylist() {
+  const playlistName = prompt("Enter playlist name:");
+  if (!playlistName) return;
 
-function playMusic(songUrl) {
-  const audioPlayer = document.getElementById('audio-player');
-  if (!audioPlayer) {
-    const audioElement = document.createElement('audio');
-    audioElement.id = 'audio-player';
-    audioElement.src = songUrl;
-    document.body.appendChild(audioElement);
-    audioElement.play();
-  } else {
-    audioPlayer.src = songUrl;
-    audioPlayer.play();
-  }
-}
-
-// Initialize Spotify Player
-window.onSpotifyWebPlaybackSDKReady = () => {
-  const player = new Spotify.Player({
-    name: 'SpotifyPlay',
-    getOAuthToken: (cb) => cb(accessToken),
-    volume: 0.5,
-  });
-
-  player.connect().then((success) => {
-    if (success) console.log('Connected to Spotify!');
-  });
-
-  player.addListener('ready', ({ device_id }) => {
-    window.spotifyDeviceId = device_id;
-  });
-};
-// Genre mappings for each playlist type
-const playlistTypeGenres = {
-  sleeping: ['ambient', 'classical', 'piano', 'sleep'],
-  workout: ['work-out', 'fitness', 'hip-hop', 'edm', 'pop'],
-  dining: ['jazz', 'dinner', 'acoustic', 'soul', 'lounge'],
-  meditation: ['ambient', 'meditation', 'new-age', 'nature'],
-  roadtrip: ['road-trip', 'rock', 'country', 'pop', 'indie']
-};
-
-// Function to generate a special playlist based on type and duration
-function generateSpecialPlaylist() {
-  const playlistType = document.getElementById('playlist-type').value;
-  const playlistLength = parseInt(document.getElementById('playlist-duration').value, 10);
+  // Get selected tracks (you'll need to implement this based on your UI)
+  const selectedTracks = getSelectedTracks(); // You need to implement this
   
-  // First get user's top genres to find the best match
-  fetch('https://api.spotify.com/v1/me/top/artists?limit=10', {
-    headers: { Authorization: `Bearer ${accessToken}` }
-  })
-    .then(response => response.json())
-    .then(artistData => {
-      // Analyze user's top genres
-      const userGenres = {};
-      artistData.items.forEach(artist => {
-        artist.genres.forEach(genre => {
-          userGenres[genre] = (userGenres[genre] || 0) + 1;
-        });
-      });
-      
-      // Find the best matching genre for this playlist type
-      const suitableGenres = playlistTypeGenres[playlistType];
-      let bestGenre = suitableGenres[0]; // default to first option
-      
-      // Check if user has any of the suitable genres in their top genres
-      for (const genre of suitableGenres) {
-        if (userGenres[genre]) {
-          bestGenre = genre;
-          break;
-        }
-      }
-      
-      // Now get recommendations based on the best genre
-      return fetch(`https://api.spotify.com/v1/recommendations?limit=${playlistLength}&seed_genres=${bestGenre}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
+  createPlaylist(playlistName, "My saved playlist", false)
+    .then(playlist => {
+      // Add tracks to the new playlist
+      return addTracksToPlaylist(playlist.id, selectedTracks);
     })
-    .then(response => response.json())
-    .then(data => {
-      const moodPlaylistList = document.getElementById('mood-playlist');
-      const playlist = data.tracks || [];
-      
-      moodPlaylistList.innerHTML = playlist.map(
-        ({ name, artists }) => `<li><span>${name} by ${artists.map(artist => artist.name).join(', ')}</span></li>`
-      ).join('');
-      
-      window.generatedPlaylist = playlist;
+    .then(() => {
+      alert("Playlist saved successfully!");
+      fetchUserPlaylists(); // Refresh the playlist list
     })
     .catch(error => {
-      console.error('Error generating playlist:', error);
-      document.getElementById('mood-playlist').innerHTML = '<li>Failed to generate playlist</li>';
+      console.error("Error saving playlist:", error);
+      alert("Failed to save playlist");
     });
+}
+
+// Function to add tracks to a playlist
+function addTracksToPlaylist(playlistId, trackUris) {
+  return fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      uris: trackUris
+    })
+  })
+  .then(response => response.json());
+}
+
+// Function to generate a special playlist
+function generateSpecialPlaylist() {
+  // Example: Create a playlist with top tracks
+  fetch('https://api.spotify.com/v1/me/top/tracks?limit=20', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    const trackUris = data.items.map(track => track.uri);
+    return createPlaylist("My Top Tracks", "Automatically generated playlist of my top tracks", true);
+  })
+  .then(playlist => {
+    return addTracksToPlaylist(playlist.id, trackUris);
+  })
+  .then(() => {
+    alert("Special playlist generated!");
+    fetchUserPlaylists(); // Refresh the playlist list
+  })
+  .catch(error => {
+    console.error("Error generating playlist:", error);
+    alert("Failed to generate playlist");
+  });
+}
+
+// Helper function to get selected tracks (you need to implement based on your UI)
+function getSelectedTracks() {
+  // This depends on how your UI tracks selected songs
+  // Example: Get all checked checkboxes and return their data-uri values
+  const selected = [];
+  document.querySelectorAll('.track-checkbox:checked').forEach(checkbox => {
+    selected.push(checkbox.getAttribute('data-uri'));
+  });
+  return selected;
 }
